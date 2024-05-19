@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <math.h>
 #include "biblioteca.h"
 
 void createInitialList(Team** head, int numberOfTeams, FILE* in){
@@ -148,26 +149,7 @@ void writeList(Team* head, FILE* out){
     Team* iter = head;
     //cât timp elementul curent NU este NULL, i se afișează numele și se trece la next
     while(iter != NULL){
-        fprintf(out, "%s\n", iter->name);
-        iter = iter->next;
-    }
-}
-
-//aceeași funcție ca și writeList, dar se afișează și poziția echipelor în turneu echipelor
-void writeListWithPointsAndPosition(Team* head, FILE* out){
-    Team* iter = head;
-    //cât timp elementul curent NU este NULL, i se afișează numele și se trece la next
-    while(iter != NULL){
-        fprintf(out, "%s   %d    %.2f\n", iter->name, iter->position, iter->points);
-        iter = iter->next;
-    }
-}
-
-//aceeași funcție ca și writeList, dar se afișează și punctajul echipelor
-void writeListWithPoints(Team* head, FILE* out){
-    Team* iter = head;
-    while(iter != NULL){
-        fprintf(out, "%-33s -  %.2f\n", iter->name, iter->points);
+        fprintf(out, "%s   %d    %.2f    %.2f\n", iter->name, iter->position, iter->points, iter->score);
         iter = iter->next;
     }
 }
@@ -195,6 +177,25 @@ Graph* createGraph(int numberOfNodes){
         }
     }
     return g;
+}
+
+void printGraph(Graph* g, FILE* out){
+    int i, j;
+    for(i = 1; i <= g->V; i++){
+        for(j = 1; j <= g->V; j++)
+            fprintf(out, "%d ", g->a[i][j]);
+        fprintf(out, "\n");
+    }
+}
+
+void freeGraph(Graph* g){
+    int i;
+    if(g != NULL){
+        for(i = 1; i <= g->V; i++)
+            free(g->a[i]);
+        free(g->a);
+        free(g);
+    }
 }
 
 //createQueue din curs
@@ -286,20 +287,6 @@ void moveMatchesFromListToQueue(Queue* q, Team** head, int bestTeams){
     }
 }
 
-//scriere(cu format) din coadă
-void writeQueue(Queue* q, FILE* out){
-    while(!queueIsEmpty(q)){
-        Match* cnt = (Match*)malloc(sizeof(Match));
-        if(cnt == NULL){
-            printf("Memory allocation failed.\n");
-            exit(1);
-        }
-        cnt = deQueue(q);
-        fprintf(out, "%-32s - %32s\n", cnt->team1->name, cnt->team2->name);
-        free(cnt);
-    }
-}
-
 //push din curs, modificată pentru tipul Team
 void push(Team** top, Team* team){
     team->next = *top;
@@ -330,17 +317,7 @@ Team* pop(Team** top){
     return aux;
 }
 
-//deleteStack din curs
-void deleteStack(Team** top){
-    Team* temp;
-    while(!stackIsEmpty(*top)){
-        temp = *top;
-        *top = (*top)->next;
-        free(temp);
-    }
-}
-
-void moveMatchesFromStackToQueue(Queue* q, Team** stackTop, int bestTeams, FILE* out){
+void moveMatchesFromStackToQueue(Queue* q, Team** stackTop, int bestTeams){
     int i;
     //din stivă se scot câte două echipe alăturate și se pun într-un meci în coadă
     for(i = 0; i < bestTeams / 2; i++){
@@ -355,41 +332,49 @@ void moveMatchesFromStackToQueue(Queue* q, Team** stackTop, int bestTeams, FILE*
     }
 }
 
+//inserare În listă în funcție de poziția din turneu
+void insertAtCorrectPosition(Team** head, Team* team){
+    if(*head == NULL){
+        team->next = *head;
+        *head = team;
+    }else{
+        Team* iter = *head;
+        Team* iter_prev = NULL;
+        while(iter != NULL && iter->position < team->position){
+            iter_prev = iter;
+            iter = iter->next;
+        }
+        if(iter == NULL){
+            iter_prev->next = team;
+            team->next = NULL;
+        }else{
+            team->next = iter;
+            iter_prev->next = team;
+        }
+    }
+}
+
 void matchResult(Team* firstTeam, Team* secondTeam, Team** winners, Team** losers, Graph* g){
     int i;
     //pe baza punctajului pe echipă, se stabilesc câștigătorii și pierzătorii, se pun în stivele corespunzătoare și se actualizează punctajele
     if(firstTeam->points > secondTeam->points){
         push(winners, firstTeam);
-        push(losers, secondTeam);
+        insertAtCorrectPosition(losers, secondTeam);
         firstTeam->points++;
         for(i = 0; i < firstTeam->numberOfPlayers; i++)
             firstTeam->members[i].points++;
+        //dacă j câștigă împotriva lui i, atunci se marchează muchia de la i la j
         g->a[secondTeam->position][firstTeam->position] = 1;
+        //se reține numărul de câștiguri pentru rezolvarea cerinței 2
         firstTeam->wins++;
     }else{
         push(winners, secondTeam);
-        push(losers, firstTeam);
+        insertAtCorrectPosition(losers, firstTeam);
         secondTeam->points++;
         for(i = 0; i < secondTeam->numberOfPlayers; i++)
             secondTeam->members[i].points++;
         g->a[firstTeam->position][secondTeam->position] = 1;
         secondTeam->wins++;
-    }
-}
-
-//se COPIAZĂ(dintr-un bloc de memorie în altul) echipele dintr-o stivă într-o listă
-void copyTeamsFromStackToList(Team* stack, Team** head ){
-    while(stack != NULL){
-        Team* temp = stack;
-        stack = stack->next;
-        Team* newElement = (Team*)malloc(sizeof(Team));
-        if(newElement == NULL){
-            printf("Memory allocation failed.\n");
-            exit(1);
-        }
-        *newElement = *temp;
-        newElement->next = *head;
-        *head = newElement;
     }
 }
 
@@ -401,11 +386,10 @@ void playMatches(Queue* q, Team** win, Team** lose, Graph* g){
             }
 }
 
-void printGraph(Graph* g, FILE* out){
-    int i, j;
-    for(i = 1; i <= g->V; i++){
-        for(j = 1; j <= g->V; j++)
-            fprintf(out, "%d ", g->a[i][j]);
-        fprintf(out, "\n");
+void calculateScores(Team* head, float q, int totalRounds){
+    Team* iter = head;
+    while(iter != NULL){
+        iter->score = (q * pow(2 - q, iter->wins)) / (pow(2, totalRounds) + pow(2 - q, totalRounds) * (q - 1));
+        iter = iter->next;
     }
 }
