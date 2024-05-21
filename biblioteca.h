@@ -1,31 +1,15 @@
 #ifndef BIBLIOTECA_H_INCLUDED
 #define BIBLIOTECA_H_INCLUDED
 
-struct jucator{
-    char* firstName;
-    char* secondName;
-    int points;
-};
-typedef struct jucator Player;
-
 struct echipa{
-    int numberOfPlayers;
     char* name;
     int position;
     int wins;
-    Player* members;
     float points;
     float score;
     struct echipa *next;
 };
 typedef struct echipa Team;
-
-struct graf{
-    int V;
-    int E;
-    int** a;
-};
-typedef struct graf Graph;
 
 struct meci{
     Team* team1;
@@ -34,33 +18,45 @@ struct meci{
 };
 typedef struct meci Match;
 
-struct Q{
+struct QM{
     Match* front;
     Match* rear;
 };
-typedef struct Q Queue;
+typedef struct QM queueMatch;
+
+struct QT{
+    Team* front;
+    Team* rear;
+};
+typedef struct QT queueTeam;
+
+struct graf{
+    int V;
+    int E;
+    int** a;
+};
+typedef struct graf Graph;
 
 void createInitialList(Team**, int, FILE*);
-int teamsRemaining(int);
 void freeTeam(Team*);
-void eliminateWorstTeams(Team**, int);
 void writeList(Team*, FILE*);
 Graph* createGraph(int);
 void printGraph(Graph*, FILE*);
 void freeGraph(Graph*);
-Queue* createQueue();
-void enQueue(Queue*, Match*);
-int queueIsEmpty(Queue*);
-Match* deQueue(Queue*);
-void freeQueue(Queue*);
-void moveMatchesFromListToQueue(Queue*, Team**, int);
+queueMatch* createQueueMatch();
+void enQueueMatch(queueMatch*, Match*);
+int queueMatchIsEmpty(queueMatch*);
+Match* deQueueMatch(queueMatch*);
+void freeQueueMatch(queueMatch*);
+queueTeam* createQueueTeam();
+void enQueueTeam(queueTeam*, Team*);
+int queueTeamIsEmpty(queueTeam*);
+Team* deQueueTeam(queueTeam*);
+void freeQueueTeam(queueTeam*);
+void moveMatchesFromListToQueue(queueMatch*, Team**, int);
 void push(Team**, Team*);
 int stackIsEmpty(Team*);
 Team* pop(Team**);
-void moveMatchesFromStackToQueue(Queue*, Team**, int);
-void insertAtCorrectPosition(Team**, Team*);
-void matchResult(Team*, Team*, Team**, Team**, Graph*);
-void playMatches(Queue*, Team**, Team**, Graph*);
-void calculateScores(Team*, float, int);
+void calculateScores(queueTeam*, float, int, FILE*);
 
 #endif // BIBLIOTECA_H_INCLUDED

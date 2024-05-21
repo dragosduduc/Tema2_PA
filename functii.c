@@ -6,74 +6,45 @@
 #include "biblioteca.h"
 
 void createInitialList(Team** head, int numberOfTeams, FILE* in){
-    int i,j;
-    char buffer1[50], buffer2[50];
-    for(i = 0; i < numberOfTeams; i++){
+    int i, pos = 0;
+    char buffer[50];
+    for(i = 0; i < 32; i++){
         Team* team = (Team*)malloc(sizeof(Team));
         if(team == NULL){
             printf("Memory allocation failed.\n");
             exit(1);
         }
         team->next = NULL;
-        team->points = 0;
         team->wins = 0;
-        fscanf(in, "%d", &team->numberOfPlayers);
+        team->position = ++pos;
+        fscanf(in, "%f", &team->points);
         //se citește separat spațiul dintre numărul de membri și numele echipei
         fgetc(in);
         //se citește numele echipei într-un buffer și se formatează
-        fgets(buffer1, 50, in);
-        buffer1[strlen(buffer1)-2] = '\0';
-        if(buffer1[strlen(buffer1) - 1] == ' ')
-            buffer1[strlen(buffer1) - 1] = '\0';
+        fgets(buffer, 50, in);
+        buffer[strlen(buffer)-1] = '\0';
+        if(buffer[strlen(buffer) - 1] == ' ')
+            buffer[strlen(buffer) - 1] = '\0';
         //se alocă memorie la pointer-ul din structură și se copiază string-ul din buffer în memoria de la pointer
-        team->name = (char*)malloc((strlen(buffer1) + 1) * sizeof(char));
+        team->name = (char*)malloc((strlen(buffer) + 1) * sizeof(char));
         if(team->name == NULL){
             printf("Memory allocation failed.\n");
             exit(1);
         }
-        strcpy(team->name, buffer1);
-        //se citesc, în mod asemănător, informațiile legate de jucători
-        team->members = (Player*)malloc(team->numberOfPlayers * sizeof(Player));
-        if(team->members == NULL){
-            printf("Memory allocation failed.\n");
-            exit(1);
-        }
-        for(j = 0; j < team->numberOfPlayers; j++){
-            fscanf(in, "%s %s %d", buffer1, buffer2, &team->members[j].points);
-            if(buffer1[strlen(buffer1) - 1] == ' ')
-                buffer1[strlen(buffer1) - 1] = '\0';
-            if(buffer2[strlen(buffer2) - 1] == ' ')
-                buffer2[strlen(buffer2) - 1] = '\0';
-            team->members[j].firstName = (char*)malloc((strlen(buffer1) + 1) * sizeof(char));
-            if(team->members[j].firstName == NULL){
-                printf("Memory allocation failed.\n");
-                exit(1);
-            }
-            team->members[j].secondName = (char*)malloc((strlen(buffer2) + 1) * sizeof(char));
-            if(team->members[j].secondName == NULL){
-                printf("Memory allocation failed.\n");
-                exit(1);
-            }
-            strcpy(team->members[j].firstName, buffer1);
-            strcpy(team->members[j].secondName, buffer2);
-            team->points += team->members[j].points;
-        }
-        //se calculează media aritmetică specifică fiecărei echipe
-        team->points = team->points / (team->numberOfPlayers * 1.0);
+        strcpy(team->name, buffer);
         //se adaugă echipa la începutul listei
         team->next = *head;
         *head = team;
     }
-}
-
-int teamsRemaining(int numberOfTeams){
-    int bestTeams = 1;
-    //se folosesc operațiile pe biți pentru a obține cea mai mare putere a lui 2 mai mică decât numărul total de echipe
-    while(bestTeams < numberOfTeams)
-        bestTeams = bestTeams << 1;
-    if(bestTeams > numberOfTeams)
-        bestTeams = bestTeams >> 1;
-    return bestTeams;
+    //în acest moment, echipele sunt în ordine inversă în echipă, așa că se inversează folosind o altă listă
+    Team* copy = NULL;
+    while (*head != NULL) {
+        Team* nextNode = (*head)->next;
+        (*head)->next = copy;
+        copy = *head;
+        *head = nextNode;
+    }
+    *head = copy;
 }
 
 //se eliberează spațiul de memorie alocat unei echipe
@@ -82,67 +53,8 @@ void freeTeam(Team* team){
     //se eliberează numele echipei
     if(team->name != NULL)
         free(team->name);
-    int i;
-    //se eliberează toate numele coechipierilor
-    for(i = 0; i < team->numberOfPlayers; i++){
-        if(team->members[i].firstName != NULL)
-            free(team->members[i].firstName);
-        if(team->members[i].secondName != NULL)
-            free(team->members[i].secondName);
-    }
-    //se eliberează tabloul de coechipieri
-    if(team->members != NULL)
-        free(team->members);
     //se eliberează structura în sine
     free(team);
-}
-
-void eliminateWorstTeams(Team** head, int worstTeams){
-    int i;
-    Team* iter;
-    //se repetă ciclul căutare minim + ștergere minim pentru câte elemente trebuie șterse
-    for(i = 0; i < worstTeams; i++){
-        float minTeamPoints = INT_MAX;
-        char minTeamPointsName[50] = "";
-        iter = *head;
-        //căutare minim
-        while(iter != NULL){
-            if(iter->points < minTeamPoints){
-                minTeamPoints = iter->points;
-                strcpy(minTeamPointsName, iter->name);
-            }
-            iter = iter->next;
-        }
-        //ștergere minim, dacă minimul este primul element din listă
-        if(strcmp((*head)->name, minTeamPointsName) == 0){
-            Team* headcopy = *head;
-            *head = (*head)->next;
-            freeTeam(headcopy);
-        }else{//ștergere minim, dacă minimul NU este primul element din listă
-            //elementul precedent elementului curent
-            Team* iter_prev = *head;
-            iter = *head;
-            int deleted = 0;
-            //nu se mai continuă parcurgerea listei dacă am șters deja elementul
-            while(iter != NULL && deleted == 0)
-                if(strcmp(iter->name, minTeamPointsName) != 0){
-                    iter_prev = iter;
-                    iter = iter->next;
-                }else{
-                    //ștergerea efectivă
-                    iter_prev->next = iter->next;
-                    freeTeam(iter);
-                    deleted = 1;
-                }
-        }
-    }
-    //se parcurge lista pentru a se stabili pozițiile în turneu
-    int pos = 0;
-    iter = *head;
-    while(iter != NULL){
-        iter->position = ++pos;
-        iter = iter->next;
-    }
 }
 
 void writeList(Team* head, FILE* out){
@@ -199,9 +111,9 @@ void freeGraph(Graph* g){
 }
 
 //createQueue din curs
-Queue* createQueue(){
-    Queue* q;
-    q = (Queue*)malloc(sizeof(Queue));
+queueMatch* createQueueMatch(){
+    queueMatch* q;
+    q = (queueMatch*)malloc(sizeof(queueMatch));
     if(q == NULL){
         printf("Memory allocation failed.\n");
         exit(1);
@@ -213,7 +125,7 @@ Queue* createQueue(){
 }
 
 //enQueue din curs, modificată pentru elemente de tip Match
-void enQueue(Queue* q, Match* game){
+void enQueueMatch(queueMatch* q, Match* game){
     if(q->rear == NULL){
         q->rear = game;
         q->front = game;
@@ -225,14 +137,14 @@ void enQueue(Queue* q, Match* game){
 }
 
 //isEmpty pentru cozi
-int queueIsEmpty(Queue* q){
+int queueMatchIsEmpty(queueMatch* q){
     return (q->front == NULL);
 }
 
 //deQueue din curs, modificată pentru elemente de tip Match
-Match* deQueue(Queue* q){
+Match* deQueueMatch(queueMatch* q){
     Match* aux;
-    if(queueIsEmpty(q)){
+    if(queueMatchIsEmpty(q)){
         aux = (Match*)malloc(sizeof(Match));
         if(aux == NULL){
             printf("Memory allocation failed.\n");
@@ -261,7 +173,7 @@ Match* deQueue(Queue* q){
     return aux;
 }
 
-void freeQueue(Queue* q){
+void freeQueueMatch(queueMatch* q){
     if(q == NULL) return;
     if(q->front != NULL)
         free(q->front);
@@ -270,7 +182,68 @@ void freeQueue(Queue* q){
     free(q);
 }
 
-void moveMatchesFromListToQueue(Queue* q, Team** head, int bestTeams){
+//createQueue din curs
+queueTeam* createQueueTeam(){
+    queueTeam* q;
+    q = (queueTeam*)malloc(sizeof(queueTeam));
+    if(q == NULL){
+        printf("Memory allocation failed.\n");
+        exit(1);
+    }
+    if(q == NULL) return NULL;
+    q->front = NULL;
+    q->rear = NULL;
+    return q;
+}
+
+//enQueue din curs, modificată pentru elemente de tip Match
+void enQueueTeam(queueTeam* q, Team* team){
+    if(q->rear == NULL){
+        q->rear = team;
+        q->front = team;
+    }else{
+        (q->rear)->next = team;
+        q->rear = team;
+    }
+    team->next = NULL;
+}
+
+//isEmpty pentru cozi
+int queueTeamIsEmpty(queueTeam* q){
+    return (q->front == NULL);
+}
+
+//deQueue din curs, modificată pentru elemente de tip Match
+Team* deQueueTeam(queueTeam* q){
+    Team* aux;
+    if(queueTeamIsEmpty(q)){
+        aux = (Team*)malloc(sizeof(Team));
+        if(aux == NULL){
+            printf("Memory allocation failed.\n");
+            exit(1);
+        }
+        strcpy(aux->name, "Queue is empty.");
+        printf("Queue is empty.\n");
+        return aux;
+    }
+    aux = q->front;
+    q->front = (q->front)->next;
+    aux->next = NULL;
+    if(q->front == NULL)
+        q->rear = NULL;
+    return aux;
+}
+
+void freeQueueTeam(queueTeam* q){
+    if(q == NULL) return;
+    if(q->front != NULL)
+        free(q->front);
+    if(q->rear != NULL)
+        free(q->rear);
+    free(q);
+}
+
+void moveMatchesFromListToQueue(queueMatch* q, Team** head, int bestTeams){
     int i;
     //din listă se scot câte două echipe alăturate și se pun într-un meci în coadă
     for(i = 0; i < bestTeams / 2; i++){
@@ -283,7 +256,7 @@ void moveMatchesFromListToQueue(Queue* q, Team** head, int bestTeams){
             *head = (*head)->next;
             game->team2 = *head;
             *head = (*head)->next;
-            enQueue(q, game);
+            enQueueMatch(q, game);
     }
 }
 
@@ -300,96 +273,20 @@ int stackIsEmpty(Team* top){
 
 //pop din curs, modificată pentru tipul Team(returnează chiar elementul - același bloc de memorie)
 Team* pop(Team** top){
-    Team* aux;
     if(stackIsEmpty(*top)){
-        aux = (Team*)malloc(sizeof(Team));
-        if(aux == NULL){
-            printf("Memory allocation failed.\n");
-            exit(1);
-        }
-        strcpy(aux->name, "Stack is empty.");
         printf("Stack is empty.\n");
-        return aux;
+        return NULL;
     }
-    aux = *top;
+    Team* aux = *top;
     *top = (*top)->next;
     aux->next = NULL;
     return aux;
 }
 
-void moveMatchesFromStackToQueue(Queue* q, Team** stackTop, int bestTeams){
-    int i;
-    //din stivă se scot câte două echipe alăturate și se pun într-un meci în coadă
-    for(i = 0; i < bestTeams / 2; i++){
-        Match* game = (Match*)malloc(sizeof(Match));
-        if(game == NULL){
-            printf("Memory allocation failed.\n");
-            exit(1);
-        }
-        game->team1 = pop(stackTop);
-        game->team2 = pop(stackTop);
-        enQueue(q, game);
-    }
-}
-
-//inserare În listă în funcție de poziția din turneu
-void insertAtCorrectPosition(Team** head, Team* team){
-    if(*head == NULL){
-        team->next = *head;
-        *head = team;
-    }else{
-        Team* iter = *head;
-        Team* iter_prev = NULL;
-        while(iter != NULL && iter->position < team->position){
-            iter_prev = iter;
-            iter = iter->next;
-        }
-        if(iter == NULL){
-            iter_prev->next = team;
-            team->next = NULL;
-        }else{
-            team->next = iter;
-            iter_prev->next = team;
-        }
-    }
-}
-
-void matchResult(Team* firstTeam, Team* secondTeam, Team** winners, Team** losers, Graph* g){
-    int i;
-    //pe baza punctajului pe echipă, se stabilesc câștigătorii și pierzătorii, se pun în stivele corespunzătoare și se actualizează punctajele
-    if(firstTeam->points > secondTeam->points){
-        push(winners, firstTeam);
-        insertAtCorrectPosition(losers, secondTeam);
-        firstTeam->points++;
-        for(i = 0; i < firstTeam->numberOfPlayers; i++)
-            firstTeam->members[i].points++;
-        //dacă j câștigă împotriva lui i, atunci se marchează muchia de la i la j
-        g->a[secondTeam->position][firstTeam->position] = 1;
-        //se reține numărul de câștiguri pentru rezolvarea cerinței 2
-        firstTeam->wins++;
-    }else{
-        push(winners, secondTeam);
-        insertAtCorrectPosition(losers, firstTeam);
-        secondTeam->points++;
-        for(i = 0; i < secondTeam->numberOfPlayers; i++)
-            secondTeam->members[i].points++;
-        g->a[firstTeam->position][secondTeam->position] = 1;
-        secondTeam->wins++;
-    }
-}
-
-//se scot meciurile din coadă și se stabilește rezultatul lor folosind funcția matchResult
-void playMatches(Queue* q, Team** win, Team** lose, Graph* g){
-    while(!queueIsEmpty(q)){
-                Match* cntMatch = deQueue(q);
-                matchResult(cntMatch->team1, cntMatch->team2, win, lose, g);
-            }
-}
-
-void calculateScores(Team* head, float q, int totalRounds){
-    Team* iter = head;
-    while(iter != NULL){
-        iter->score = (q * pow(2 - q, iter->wins)) / (pow(2, totalRounds) + pow(2 - q, totalRounds) * (q - 1));
-        iter = iter->next;
+void calculateScores(queueTeam* head, float q, int totalMatches, FILE* out){
+    while(!queueTeamIsEmpty(head)){
+        Team* iter = deQueueTeam(head);
+        iter->score = (q * pow(2 - q, iter->wins)) / (pow(2, totalMatches) + pow(2 - q, totalMatches) * (q - 1));
+        fprintf(out, "%.4f %s\n", iter->score, iter->name);
     }
 }

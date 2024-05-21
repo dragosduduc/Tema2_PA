@@ -1,19 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "biblioteca.h"
 
 int main(int argc, char* argv[]){
 
-    //se deschide fișierul de intrare d.in
+    int numberOfTeams = 32;
+
+    //se deschide fișierul de intrare
     FILE* in;
     if((in = fopen(argv[1], "rt")) == NULL){
         printf("Fisierul de intrare nu a putut fi deschis.\n");
         exit(1);
     }
-
-    //se citește numărul de echipe din fișierul de intrare
-    int numberOfTeams;
-    fscanf(in, "%d", &numberOfTeams);
 
     //se formează lista de echipe
     Team* mainList = NULL;
@@ -21,74 +20,71 @@ int main(int argc, char* argv[]){
 
     fclose(in);
 
-    //se calculează cea mai mare putere a lui 2 mai mică decât numărul total de echipe
-    int maxPower;
-    maxPower = teamsRemaining(numberOfTeams);
-
-    int teamsToEliminate = numberOfTeams - maxPower;
-
-    //se elimină echipele cu cele mai mici punctaje, pentru a se ajunge la un număr de echipe - putere a lui 2
-    eliminateWorstTeams(&mainList, teamsToEliminate);
-
     //se inițializează graful orientat asociat turneului
-    Graph* g = createGraph(maxPower);
+    Graph* g = createGraph(numberOfTeams);
 
     //se creează și se populează coada de meciuri
-    Queue* matches;
-    matches = createQueue();
-    moveMatchesFromListToQueue(matches, &mainList, maxPower);
+    queueMatch* matches = createQueueMatch();
+    moveMatchesFromListToQueue(matches, &mainList, numberOfTeams);
 
-    //se inițializează stiva pentru câștigători lista de pierzători care, în final, va conține toate echipele cu informațiile actualizate
-    Team* winnerStackTop = NULL;
-    Team* newList = NULL;
+    //se inițializează cozile pentru câștigători și pierzători
+    queueTeam* winnerQueue = createQueueTeam();
+    queueTeam* loserQueue = createQueueTeam();
 
     //cât timp au mai rămas meciuri/runde de jucat, se joacă
-    int totalRounds = 0;
-    while(maxPower > 1){
-        totalRounds++;
+    int COPYnumberOfTeam = numberOfTeams;
+    int numberOfGames = 0;
+    while(COPYnumberOfTeam > 1){
+        numberOfGames++;
+        while(!queueMatchIsEmpty(matches)){
+            Match* cnt = deQueueMatch(matches);
+            if(cnt->team1->points > cnt->team2->points || (cnt->team1->points == cnt->team2->points && strcmp(cnt->team1->name, cnt->team2->name) > 0)){
+                cnt->team1->wins++;
+                enQueueTeam(winnerQueue, cnt->team1);
+                enQueueTeam(loserQueue, cnt->team2);
+                g->a[cnt->team2->position][cnt->team1->position] = 1;
+            }else if(cnt->team1->points < cnt->team2->points || (cnt->team1->points == cnt->team2->points && strcmp(cnt->team1->name, cnt->team2->name) < 0)){
+                cnt->team2->wins++;
+                enQueueTeam(winnerQueue, cnt->team2);
+                enQueueTeam(loserQueue, cnt->team1);
+                g->a[cnt->team1->position][cnt->team2->position] = 1;
+            }
+        }
+        COPYnumberOfTeam = COPYnumberOfTeam >> 1;
+        for(int i = 0; i < COPYnumberOfTeam / 2; i++){
+            Match* temp = (Match*)malloc(sizeof(Match));
+            temp->team1 = deQueueTeam(winnerQueue);
+            temp->team2 = deQueueTeam(winnerQueue);
+            enQueueMatch(matches, temp);
+        }
 
-        winnerStackTop = NULL;
-
-        playMatches(matches, &winnerStackTop, &newList, g);
-        
-        //se înjumătățește numărul de echipe - rămân doar câștigătorii, se afișează și se pun înapoi în coada de meciuri
-        maxPower = maxPower >> 1;
-        moveMatchesFromStackToQueue(matches, &winnerStackTop, maxPower);
     }
+    enQueueTeam(loserQueue, deQueueTeam(winnerQueue));
 
     //se eliberează spațiul de memorie alocat cozii de meciuri
-    freeQueue(matches);
-
-    //echipa câștigătoare, care a rămas în stiva de câștigători, se pune pe poziția corectă în noua listă
-    insertAtCorrectPosition(&newList, pop(&winnerStackTop));
+    freeQueueTeam(winnerQueue);
+    freeQueueMatch(matches);
 
     //se scrie matricea de adiacență a grafului turneului în fișierul -graf-
     FILE* outGraph;
-    if((outGraph = fopen("graf", "wt")) == NULL){
+    if((outGraph = fopen(argv[2], "wt")) == NULL){
         printf("Fișierul 'graf' nu a putut fi deschis.\n");
         exit(1);
     }
     printGraph(g, outGraph);
     fclose(outGraph);
 
-    //se calculează scorurile echipelor și se scriu în fișierul -scoruri-
-    float q = 0.15;
-    calculateScores(newList, q, totalRounds);
-
     FILE* outScores;
-    if((outScores = fopen("scoruri", "wt")) == NULL){
+    if((outScores = fopen(argv[3], "wt")) == NULL){
         printf("Fișierul 'scoruri' nu a putut fi deschis.\n");
         exit(1);
     }
-    writeList(newList, outScores);
-    fclose(outScores);
 
-    //se eliberează spațiul de memorie alocat noii liste
-    Team* iter = newList;
-    while(iter != NULL){
-        freeTeam(iter);
-        iter = iter->next;
-    }
+    //se calculează scorurile echipelor și se scriu în fișierul -scoruri-
+    float q = 0.15;
+    calculateScores(loserQueue, q, numberOfGames + 1, outScores);
+
+    fclose(outScores);
 
     //se eliberează spațiul de memorie alocat grafului
     freeGraph(g);
