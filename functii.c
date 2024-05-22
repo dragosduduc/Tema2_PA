@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include <math.h>
 #include "biblioteca.h"
 
+//se formează lista de echipe cu informațiile din fișierul de intrare
 void createInitialList(Team** head, int numberOfTeams, FILE* in){
     int i, pos = 0;
     char buffer[50];
-    for(i = 0; i < 32; i++){
+    for(i = 0; i < numberOfTeams; i++){
         Team* team = (Team*)malloc(sizeof(Team));
         if(team == NULL){
             printf("Memory allocation failed.\n");
@@ -36,7 +36,7 @@ void createInitialList(Team** head, int numberOfTeams, FILE* in){
         team->next = *head;
         *head = team;
     }
-    //în acest moment, echipele sunt în ordine inversă în echipă, așa că se inversează folosind o altă listă
+    //în acest moment, echipele sunt în ordine inversă în listă, așa că se inversează folosind o altă listă
     Team* copy = NULL;
     while (*head != NULL) {
         Team* nextNode = (*head)->next;
@@ -57,9 +57,10 @@ void freeTeam(Team* team){
     free(team);
 }
 
+//scrierea unei liste într-un fișier
 void writeList(Team* head, FILE* out){
     Team* iter = head;
-    //cât timp elementul curent NU este NULL, i se afișează numele și se trece la next
+    //cât timp elementul curent NU este NULL, se afișează și se trece la next
     while(iter != NULL){
         fprintf(out, "%s   %d    %.2f    %.2f\n", iter->name, iter->position, iter->points, iter->score);
         iter = iter->next;
@@ -91,6 +92,7 @@ Graph* createGraph(int numberOfNodes){
     return g;
 }
 
+//se printează matricea de adiacentă a unui graf într-un fișier
 void printGraph(Graph* g, FILE* out){
     int i, j;
     for(i = 1; i <= g->V; i++){
@@ -100,6 +102,7 @@ void printGraph(Graph* g, FILE* out){
     }
 }
 
+//se eliberează memoria alocată unui graf
 void freeGraph(Graph* g){
     int i;
     if(g != NULL){
@@ -110,7 +113,7 @@ void freeGraph(Graph* g){
     }
 }
 
-//createQueue din curs
+//createQueue din curs, adaptat la o coadă de meciuri
 queueMatch* createQueueMatch(){
     queueMatch* q;
     q = (queueMatch*)malloc(sizeof(queueMatch));
@@ -124,7 +127,7 @@ queueMatch* createQueueMatch(){
     return q;
 }
 
-//enQueue din curs, modificată pentru elemente de tip Match
+//enQueue din curs, adaptat la o coadă de meciuri
 void enQueueMatch(queueMatch* q, Match* game){
     if(q->rear == NULL){
         q->rear = game;
@@ -136,12 +139,12 @@ void enQueueMatch(queueMatch* q, Match* game){
     game->next = NULL;
 }
 
-//isEmpty pentru cozi
+//isEmpty pentru cozi de meciuri
 int queueMatchIsEmpty(queueMatch* q){
     return (q->front == NULL);
 }
 
-//deQueue din curs, modificată pentru elemente de tip Match
+//deQueue din curs, adaptat la o coadă de meciuri
 Match* deQueueMatch(queueMatch* q){
     Match* aux;
     if(queueMatchIsEmpty(q)){
@@ -173,6 +176,7 @@ Match* deQueueMatch(queueMatch* q){
     return aux;
 }
 
+//eliberarea spațiului alocat unei cozi de meciuri
 void freeQueueMatch(queueMatch* q){
     if(q == NULL) return;
     if(q->front != NULL)
@@ -182,7 +186,7 @@ void freeQueueMatch(queueMatch* q){
     free(q);
 }
 
-//createQueue din curs
+//createQueue din curs, adaptat la o coadă de echipe
 queueTeam* createQueueTeam(){
     queueTeam* q;
     q = (queueTeam*)malloc(sizeof(queueTeam));
@@ -196,7 +200,7 @@ queueTeam* createQueueTeam(){
     return q;
 }
 
-//enQueue din curs, modificată pentru elemente de tip Match
+//enQueue din curs, adaptat la o coadă de echipe
 void enQueueTeam(queueTeam* q, Team* team){
     if(q->rear == NULL){
         q->rear = team;
@@ -208,12 +212,12 @@ void enQueueTeam(queueTeam* q, Team* team){
     team->next = NULL;
 }
 
-//isEmpty pentru cozi
+//isEmpty pentru cozi de echipe
 int queueTeamIsEmpty(queueTeam* q){
     return (q->front == NULL);
 }
 
-//deQueue din curs, modificată pentru elemente de tip Match
+//deQueue din curs, adaptat la o coadă de echipe
 Team* deQueueTeam(queueTeam* q){
     Team* aux;
     if(queueTeamIsEmpty(q)){
@@ -234,6 +238,7 @@ Team* deQueueTeam(queueTeam* q){
     return aux;
 }
 
+//eliberarea spațiului alocat unei cozi de echipe
 void freeQueueTeam(queueTeam* q){
     if(q == NULL) return;
     if(q->front != NULL)
@@ -243,6 +248,7 @@ void freeQueueTeam(queueTeam* q){
     free(q);
 }
 
+//se mută elementele listei de echipe în coada de meciuri
 void moveMatchesFromListToQueue(queueMatch* q, Team** head, int bestTeams){
     int i;
     //din listă se scot câte două echipe alăturate și se pun într-un meci în coadă
@@ -271,7 +277,7 @@ int stackIsEmpty(Team* top){
     return (top == NULL);
 }
 
-//pop din curs, modificată pentru tipul Team(returnează chiar elementul - același bloc de memorie)
+//pop din curs, modificată pentru tipul Team
 Team* pop(Team** top){
     if(stackIsEmpty(*top)){
         printf("Stack is empty.\n");
@@ -283,10 +289,41 @@ Team* pop(Team** top){
     return aux;
 }
 
+//se extrag meciurile din coada de meciuri, se stabilesc câștigătorii și pierzătorii, se umplu cozile respective și se formează graful turneului
+void playMatches(queueMatch* cnt, queueTeam* winners, queueTeam* losers, Graph* g){
+    while(!queueMatchIsEmpty(cnt)){
+        Match* temp = deQueueMatch(cnt);
+        if(temp->team1->points > temp->team2->points || (temp->team1->points == temp->team2->points && strcmp(temp->team1->name, temp->team2->name) > 0)){
+            temp->team1->wins++;
+            enQueueTeam(winners, temp->team1);
+            enQueueTeam(losers, temp->team2);
+            g->a[temp->team2->position][temp->team1->position] = 1;
+        }else if(temp->team1->points < temp->team2->points || (temp->team1->points == temp->team2->points && strcmp(temp->team1->name, temp->team2->name) < 0)){
+            temp->team2->wins++;
+            enQueueTeam(winners, temp->team2);
+            enQueueTeam(losers, temp->team1);
+            g->a[temp->team1->position][temp->team2->position] = 1;
+        }
+    }
+}
+
+//se mută elementele din coada de câștigători în coada de meciuri
+void moveTeamsFromQueueTeamToQueueMatch(queueMatch* games, queueTeam* winners, int numberOfTeams){
+    int i;
+    for(i = 0; i < numberOfTeams / 2; i++){
+        Match* temp = (Match*)malloc(sizeof(Match));
+        temp->team1 = deQueueTeam(winners);
+        temp->team2 = deQueueTeam(winners);
+        enQueueMatch(games, temp);
+    }
+}
+
+//se calculează scorul unei echipe pe baza formulei din îndrumar, se afișează și se eliberează spațiul de memorie alocat echipei
 void calculateScores(queueTeam* head, float q, int totalMatches, FILE* out){
     while(!queueTeamIsEmpty(head)){
         Team* iter = deQueueTeam(head);
         iter->score = (q * pow(2 - q, iter->wins)) / (pow(2, totalMatches) + pow(2 - q, totalMatches) * (q - 1));
         fprintf(out, "%.4f %s\n", iter->score, iter->name);
+        freeTeam(iter);
     }
 }

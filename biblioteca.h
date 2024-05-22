@@ -57,6 +57,8 @@ void moveMatchesFromListToQueue(queueMatch*, Team**, int);
 void push(Team**, Team*);
 int stackIsEmpty(Team*);
 Team* pop(Team**);
+void playMatches(queueMatch*, queueTeam*, queueTeam*, Graph*);
+void moveTeamsFromQueueTeamToQueueMatch(queueMatch*, queueTeam*, int);
 void calculateScores(queueTeam*, float, int, FILE*);
 
 #endif // BIBLIOTECA_H_INCLUDED
